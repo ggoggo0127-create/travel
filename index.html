@@ -92,7 +92,10 @@ body.gmap .gnote{display:block}
 .card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;padding:10px 12px;margin:6px 0 6px 4px}
 .card.on{border-color:var(--ink)}
 .card.fin{background:#F7F8F5}
-.card.drag{touch-action:pan-y}
+.card.drag{touch-action:pan-y;position:relative}
+.card.drag::after{content:"";position:absolute;right:9px;top:50%;transform:translateY(-50%);
+  width:14px;height:12px;opacity:.28;
+  background:linear-gradient(var(--ink3) 2px,transparent 2px) 0 0/100% 5px repeat-y}
 .card.dragging{opacity:.32}
 .dragghost{position:fixed;z-index:9998;pointer-events:none;box-shadow:0 12px 28px rgba(26,33,48,.28);
   transform:scale(1.02);border-color:var(--ink)!important;background:var(--panel)}
@@ -761,7 +764,7 @@ function render_(){
                  :`https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}`;
     html+=`<div class="row"><div class="tcol">${toHM(r.arrive)}${s.stay?`<span class="out">${toHM(r.depart)}</span>`:""}</div>
       <div class="rail"><i class="dot${s.cat==="호텔"?" sq":""}${fin?" done":""}" style="border-color:${c};color:${c}"></i></div>
-      <div class="card${on?" on":""}${fin?" fin":""}${AU?"":" drag"}" data-card="${s.id}" data-idx="${r.seq}">
+      <div class="card${on?" on":""}${fin?" fin":""}${(AU||on)?"":" drag"}" data-card="${s.id}" data-idx="${r.seq}">
         <button class="chead" data-open="${s.id}" aria-expanded="${on}">
           <span class="seqno" style="background:${c}">${r.seq}</span>
           <span class="cat" style="background:${c}">${s.cat}</span>${AU?`<span class="autotag">자동</span>`:""}
@@ -1433,6 +1436,7 @@ function endDrag(){
 document.addEventListener("touchstart",e=>{
   const card=e.target.closest(".card.drag");
   if(!card)return;
+
   if(e.target.closest("input,textarea,button,a,select"))return;
   const t=e.touches[0];DRAG.sy=t.clientY;
   DRAG.timer=setTimeout(()=>startDrag(card,t.clientX,t.clientY),420);
