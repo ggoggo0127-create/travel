@@ -374,7 +374,13 @@ body.gmap .gnote{display:block}
 
 
 <footer class="foot">
-  <button id="reconn" style="display:none;border-color:#F0C24B;background:#FDF6E3;color:#7A5A00">파일 연결 다시 허용</button><button id="link">파일에 자동저장 연결</button><button id="exp">내보내기</button><button id="imp">불러오기</button><input type="file" id="impf" accept=".json" hidden><input type="file" id="phfile" accept="image/*" multiple hidden>
+  <button id="reconn" style="display:none;border-color:#F0C24B;background:#FDF6E3;color:#7A5A00">파일 연결 다시 허용</button><button id="link">파일에 자동저장 연결</button><button id="exp">내보내기</button><button id="imp">불러오기</button><button id="paste">붙여넣기로 불러오기</button><input type="file" id="impf" hidden><input type="file" id="phfile" accept="image/*" multiple hidden>
+  <div id="pastebox" style="display:none;margin-top:10px">
+    <textarea id="pastein" placeholder="PC에서 연 여행맵.json 내용을 전체 복사해서 여기에 붙여넣으세요"
+      style="width:100%;min-height:110px;border:1px solid var(--rule);border-radius:10px;
+      background:var(--paper);padding:10px;font-family:var(--mono);font-size:11px;line-height:1.6"></textarea>
+    <button id="pasteok" style="margin-top:6px">이 내용으로 불러오기</button>
+  </div>
   <br>지도 © OpenStreetMap 기여자 · 평점·영업시간·길찾기 데이터 © Google
 </footer>
 
@@ -1401,7 +1407,7 @@ function showWarn(){
 
 /* ═══ 조작 ═══ */
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-day],[data-open],[data-done],[data-del],[data-mv],[data-legedit],[data-segdel],[data-segadd],[data-fetchleg],[data-pick],[data-close],#addday,#addbtn,#setbtn,#delday,#go,#keysave,#diagrun,#savebtn,#warnx,#exp,#imp,#link,#reconn,#tripbtn,#basebtn,#basebtn2,#bgo,#mkNew,#mkCopy,#sgApply,#sgNo,[data-usetrip],[data-padd],[data-othercat],[data-m3],[data-phadd],[data-phdel],[data-mmode],[data-msave],[data-mclear],[data-diag],[data-bpick],[data-adel],[data-akind]");
+  const t=e.target.closest("[data-day],[data-open],[data-done],[data-del],[data-mv],[data-legedit],[data-segdel],[data-segadd],[data-fetchleg],[data-pick],[data-close],#addday,#addbtn,#setbtn,#delday,#go,#keysave,#diagrun,#savebtn,#warnx,#exp,#imp,#paste,#pasteok,#link,#reconn,#tripbtn,#basebtn,#basebtn2,#bgo,#mkNew,#mkCopy,#sgApply,#sgNo,[data-usetrip],[data-padd],[data-othercat],[data-m3],[data-phadd],[data-phdel],[data-mmode],[data-msave],[data-mclear],[data-diag],[data-bpick],[data-adel],[data-akind]");
   if(!t)return;const d=D();
   const id=k=>t.dataset[k];
   if(id("day")!==undefined&&t.dataset.day){S.di=+t.dataset.day;S.open=null;S.legEdit=null}
@@ -1459,7 +1465,21 @@ document.addEventListener("click",e=>{
   else if(t.id==="warnx"){document.getElementById("warnbar").innerHTML="";return}
   else if(t.id==="savebtn"){doExport();return}
   else if(t.id==="exp"){doExport();return}
-  else if(t.id==="imp"){openFile();return}
+  else if(t.id==="imp"){document.getElementById("impf").click();return}
+  else if(t.id==="paste"){
+    const box=document.getElementById("pastebox");
+    box.style.display=box.style.display==="none"?"block":"none";return}
+  else if(t.id==="pasteok"){
+    const v=document.getElementById("pastein").value.trim();
+    if(!v){alert("내용을 붙여넣어 주세요.");return}
+    try{const j=JSON.parse(v);
+      if(j.trips){LIB=j;T=LIB.trips[LIB.cur]||Object.values(LIB.trips)[0]}
+      else{const id=uid();j.id=id;LIB.trips[id]=j;LIB.cur=id;T=j}
+      S.di=0;document.getElementById("pastebox").style.display="none";
+      document.getElementById("pastein").value="";
+      render();save();alert("불러왔습니다.");
+    }catch(e){alert("형식이 올바르지 않습니다. json 전체를 복사했는지 확인해 주세요.")}
+    return}
   else if(t.id==="link"){linkFile();return}
   else if(t.id==="reconn"){grantFile();return}
   else if(t.dataset.open){S.open=S.open===t.dataset.open?null:t.dataset.open}
@@ -1605,7 +1625,9 @@ document.getElementById("impf").addEventListener("change",e=>{
   r.onload=()=>{try{const j=JSON.parse(r.result);
     if(j.trips){LIB=j;T=LIB.trips[LIB.cur]||Object.values(LIB.trips)[0]}
     else{const id=uid();j.id=id;LIB.trips[id]=j;LIB.cur=id;T=j}
-    S.di=0;render()}catch(err){alert("파일을 읽을 수 없습니다")}};r.readAsText(f)});
+    S.di=0;render();save();alert("불러왔습니다.")}
+    catch(err){alert("이 파일은 여행맵 데이터가 아닙니다.\n여행맵.json 파일을 선택해 주세요.")}};
+  r.readAsText(f)});
 document.querySelectorAll(".ovl").forEach(o=>o.addEventListener("click",e=>{if(e.target===o)o.classList.remove("on")}));
 
 document.getElementById("hereNears").innerHTML=
