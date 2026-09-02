@@ -31,7 +31,6 @@ a{color:inherit}
 .savest{font-size:11px;font-weight:700;color:var(--ink3);align-self:center;white-space:nowrap}
 .savest.ok{color:#0E7C66}
 .savest.bad{color:#C8352B}
-.savebtn{background:var(--ink)!important;color:#fff!important;border-color:var(--ink)!important}
 .wbar{background:#FBECEA;border-bottom:1px solid #EBC9C5;padding:10px 16px;font-size:12.5px;
   color:#8A2E24;line-height:1.7}
 .wbar b{font-weight:800}
@@ -340,7 +339,7 @@ body.gmap .gnote{display:block}
 <header class="mast">
   <div class="mast-row">
     <h1 id="ttl" contenteditable="true">오사카 · 쿄토</h1>
-    <span style="display:flex;gap:6px"><span class="savest" id="savest"></span><button class="iconbtn savebtn" id="savebtn">저장</button><button class="iconbtn" id="basebtn">거점</button><button class="iconbtn" id="tripbtn">여행 목록</button><button class="iconbtn" id="setbtn">설정</button></span>
+    <span style="display:flex;gap:6px"><span class="savest" id="savest"></span><button class="iconbtn" id="basebtn">거점</button><button class="iconbtn" id="tripbtn">여행 목록</button><button class="iconbtn" id="setbtn">설정</button></span>
   </div>
   <div class="legend" id="legend"></div>
 </header>
@@ -374,14 +373,8 @@ body.gmap .gnote{display:block}
 
 
 <footer class="foot">
-  <button id="reconn" style="display:none;border-color:#F0C24B;background:#FDF6E3;color:#7A5A00">파일 연결 다시 허용</button><button id="link">파일에 자동저장 연결</button><button id="exp">내보내기</button><button id="imp">불러오기</button><button id="fromweb">웹에서 불러오기</button><button id="paste">붙여넣기</button><input type="file" id="impf" hidden><input type="file" id="phfile" accept="image/*" multiple hidden>
-  <div id="pastebox" style="display:none;margin-top:10px">
-    <textarea id="pastein" placeholder="PC에서 연 여행맵.json 내용을 전체 복사해서 여기에 붙여넣으세요"
-      style="width:100%;min-height:110px;border:1px solid var(--rule);border-radius:10px;
-      background:var(--paper);padding:10px;font-family:var(--mono);font-size:11px;line-height:1.6"></textarea>
-    <button id="pasteread" style="margin-top:6px">클립보드에서 붙여넣기</button>
-    <button id="pasteok" style="margin-top:6px">이 내용으로 불러오기</button>
-  </div>
+  <button id="exp">저장 파일 받기</button><button id="fromweb">웹에서 불러오기</button>
+  <input type="file" id="phfile" accept="image/*" multiple hidden>
   <br>지도 © OpenStreetMap 기여자 · 평점·영업시간·길찾기 데이터 © Google
 </footer>
 
@@ -523,7 +516,6 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
    2순위: 브라우저 저장소(localStorage)
    저장될 때마다 화면 우측 상단에 '저장됨 HH:MM'이 표시됩니다. */
 const KEY="tmap:v18";
-let FH=null;               // 연결된 파일 핸들
 let saveTimer=null, lastSaved=null, saveState="";
 
 function canLS(){try{localStorage.setItem("__t","1");localStorage.removeItem("__t");return true}catch(e){return false}}
@@ -546,26 +538,19 @@ function setSaveState(txt,cls){
 async function saveNow(){
   const json=JSON.stringify(LIB);
   let ok=false;
-  if(FH){
-    try{const w=await FH.createWritable();await w.write(json);await w.close();ok=true}
-    catch(e){FH=null}
-  }
   if(HAS_LS){
     try{localStorage.setItem(KEY,json);ok=true}catch(e){
-      setSaveState("저장 공간 부족 — 사진을 줄이거나 파일 연결을 써주세요","bad");
-      if(!FH)alert("브라우저 저장 공간이 찼습니다.\n'파일에 자동저장 연결'을 쓰면 용량 제한이 없어집니다.");
-      return}
+      setSaveState("저장 공간 부족 — 사진을 줄여 주세요","bad");
+        return}
   }
   if(!ok){setSaveState("저장 안 됨 — 내보내기를 해주세요","bad");return}
   lastSaved=new Date();
-  setSaveState((FH?"파일 저장됨 ":"저장됨 ")+pad(lastSaved.getHours())+":"+pad(lastSaved.getMinutes()),"ok");
+  setSaveState("저장됨 "+pad(lastSaved.getHours())+":"+pad(lastSaved.getMinutes()),"ok");
 }
 let dirty=0;
 function save(){                      // 잦은 호출을 묶어서 저장
   if(PERSIST===false){
     dirty++;
-    const b=document.getElementById("savebtn");
-    if(b)b.textContent=`저장 (${dirty})`;
     setSaveState("저장 안 됨 — 저장 버튼을 눌러 주세요","bad");
     return;
   }
@@ -579,62 +564,11 @@ async function load(){
     if(v){LIB=JSON.parse(v);T=LIB.trips[LIB.cur]||Object.values(LIB.trips)[0]}}catch(e){}
 }
 // 연결한 파일을 다음에도 기억 (IndexedDB에 핸들 보관)
-function idb(){return new Promise((res,rej)=>{
-  const r=indexedDB.open("tmapfh",1);
-  r.onupgradeneeded=()=>r.result.createObjectStore("h");
-  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
-async function fhSave(h){try{const db=await idb();
-  db.transaction("h","readwrite").objectStore("h").put(h,"file")}catch(e){}}
-async function fhLoad(){try{const db=await idb();
-  return await new Promise(res=>{const q=db.transaction("h").objectStore("h").get("file");
-    q.onsuccess=()=>res(q.result||null);q.onerror=()=>res(null)})}catch(e){return null}}
-async function reconnect(){
-  const h=await fhLoad();if(!h)return false;
-  try{
-    const p=await h.queryPermission({mode:"readwrite"});
-    if(p==="granted"){FH=h;return true}
-    const el=document.getElementById("reconn");
-    if(el)el.style.display="inline-block";
-    PENDING_FH=h;
-  }catch(e){}
-  return false;
-}
-let PENDING_FH=null;
-async function grantFile(){
-  if(!PENDING_FH)return;
-  try{const p=await PENDING_FH.requestPermission({mode:"readwrite"});
-    if(p==="granted"){FH=PENDING_FH;
-      const f=await FH.getFile(),txt=await f.text();
-      if(txt.trim()){const j=JSON.parse(txt);
-        if(j.trips){LIB=j;T=LIB.trips[LIB.cur]||Object.values(LIB.trips)[0];S.di=0}}
-      document.getElementById("reconn").style.display="none";
-      render();await saveNow();}
-  }catch(e){}
-}
+
+
 // 크롬 계열: json 파일을 직접 연결해 자동 저장
-async function linkFile(){
-  if(!window.showSaveFilePicker){
-    alert("이 브라우저는 파일 자동저장을 지원하지 않습니다.\nPC 크롬/엣지에서 사용해 주세요.");return}
-  try{
-    FH=await window.showSaveFilePicker({suggestedName:"여행맵.json",
-      types:[{description:"여행맵 데이터",accept:{"application/json":[".json"]}}]});
-    await fhSave(FH);
-    await saveNow();
-    alert("연결되었습니다. 이제 수정할 때마다 이 파일에 자동으로 저장됩니다.");
-    render();
-  }catch(e){}
-}
-async function openFile(){
-  if(!window.showOpenFilePicker){document.getElementById("impf").click();return}
-  try{
-    const [h]=await window.showOpenFilePicker({
-      types:[{description:"여행맵 데이터",accept:{"application/json":[".json"]}}]});
-    const f=await h.getFile(),j=JSON.parse(await f.text());
-    if(j.trips){LIB=j;T=LIB.trips[LIB.cur]||Object.values(LIB.trips)[0]}
-    else{const id=uid();j.id=id;LIB.trips[id]=j;LIB.cur=id;T=j}
-    FH=h;await fhSave(FH);S.di=0;render();await saveNow();
-  }catch(e){}
-}
+
+
 // 닫기 전 마지막 저장
 window.addEventListener("beforeunload",()=>{
   if(HAS_LS){try{localStorage.setItem(KEY,JSON.stringify(LIB))}catch(e){}}
@@ -1407,7 +1341,7 @@ function doExport(){
     a.href=URL.createObjectURL(b);a.download="여행맵.json";
     document.body.appendChild(a);a.click();a.remove();
     setTimeout(()=>URL.revokeObjectURL(a.href),3000);
-    dirty=0;const bb=document.getElementById("savebtn");if(bb)bb.textContent="저장";
+    dirty=0;
     setSaveState("파일로 저장함","ok");
   }catch(e){alert("저장에 실패했습니다: "+e.message)}
 }
@@ -1417,14 +1351,14 @@ function showWarn(){
     el.innerHTML=`<div class="wbar">
       <b>이 기기에서는 자동 저장이 되지 않습니다.</b><br>
       폰에서 파일을 직접 열면 브라우저가 저장을 막는 경우가 있습니다.
-      작업을 마치면 위의 <b>저장</b> 버튼을 눌러 여행맵.json을 내려받아 두세요.
+      맨 아래 <b>저장 파일 받기</b>로 백업해 두세요.
       <br><button id="warnx">알겠습니다</button></div>`;
   }else el.innerHTML="";
 }
 
 /* ═══ 조작 ═══ */
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-day],[data-open],[data-done],[data-del],[data-mv],[data-legedit],[data-segdel],[data-segadd],[data-fetchleg],[data-pick],[data-close],#addday,#addbtn,#setbtn,#delday,#go,#keysave,#diagrun,#savebtn,#warnx,#exp,#imp,#paste,#pasteok,#fromweb,#pasteread,#link,#reconn,#tripbtn,#basebtn,#basebtn2,#bgo,#mkNew,#mkCopy,#sgApply,#sgNo,[data-usetrip],[data-padd],[data-othercat],[data-m3],[data-phadd],[data-phdel],[data-mmode],[data-msave],[data-mclear],[data-diag],[data-bpick],[data-adel],[data-akind]");
+  const t=e.target.closest("[data-day],[data-open],[data-done],[data-del],[data-mv],[data-legedit],[data-segdel],[data-segadd],[data-fetchleg],[data-pick],[data-close],#addday,#addbtn,#setbtn,#delday,#go,#keysave,#diagrun,#exp,#fromweb,#tripbtn,#basebtn,#basebtn2,#bgo,#mkNew,#mkCopy,#sgApply,#sgNo,[data-usetrip],[data-padd],[data-othercat],[data-m3],[data-phadd],[data-phdel],[data-mmode],[data-msave],[data-mclear],[data-diag],[data-bpick],[data-adel],[data-akind]");
   if(!t)return;const d=D();
   const id=k=>t.dataset[k];
   if(id("day")!==undefined&&t.dataset.day){S.di=+t.dataset.day;S.open=null;S.legEdit=null}
@@ -1479,31 +1413,8 @@ document.addEventListener("click",e=>{
   else if(t.id==="keysave"){T.key=document.getElementById("keyin").value.trim();
     Object.values(LIB.trips).forEach(x=>x.key=T.key);GM=null;save();if(map)setBase();
     document.getElementById("ovlSet").classList.remove("on");renderCats();return}
-  else if(t.id==="warnx"){document.getElementById("warnbar").innerHTML="";return}
-  else if(t.id==="savebtn"){doExport();return}
   else if(t.id==="exp"){doExport();return}
-  else if(t.id==="imp"){document.getElementById("impf").click();return}
   else if(t.id==="fromweb"){loadFromWeb();return}
-  else if(t.id==="pasteread"){
-    (async()=>{try{const txt=await navigator.clipboard.readText();
-      document.getElementById("pastein").value=txt;}
-      catch(e){alert("클립보드를 읽지 못했습니다. 직접 붙여넣기 해주세요.")}})();return}
-  else if(t.id==="paste"){
-    const box=document.getElementById("pastebox");
-    box.style.display=box.style.display==="none"?"block":"none";return}
-  else if(t.id==="pasteok"){
-    const v=document.getElementById("pastein").value.trim();
-    if(!v){alert("내용을 붙여넣어 주세요.");return}
-    try{const j=JSON.parse(v);
-      if(j.trips){LIB=j;T=LIB.trips[LIB.cur]||Object.values(LIB.trips)[0]}
-      else{const id=uid();j.id=id;LIB.trips[id]=j;LIB.cur=id;T=j}
-      S.di=0;document.getElementById("pastebox").style.display="none";
-      document.getElementById("pastein").value="";
-      render();save();alert("불러왔습니다.");
-    }catch(e){alert("형식이 올바르지 않습니다. json 전체를 복사했는지 확인해 주세요.")}
-    return}
-  else if(t.id==="link"){linkFile();return}
-  else if(t.id==="reconn"){grantFile();return}
   else if(t.dataset.open){S.open=S.open===t.dataset.open?null:t.dataset.open}
   else if(t.dataset.done){const s=d.stops.find(x=>x.id===t.dataset.done)||realStop(t.dataset.done);
     s.doneAt=(s.doneAt!=null)?null:(S.now??toMin(d.start))}
@@ -1642,21 +1553,13 @@ document.getElementById("phfile").addEventListener("change",async e=>{
   }
   save();render();
 });
-document.getElementById("impf").addEventListener("change",e=>{
-  const f=e.target.files[0];if(!f)return;const r=new FileReader();
-  r.onload=()=>{try{const j=JSON.parse(r.result);
-    if(j.trips){LIB=j;T=LIB.trips[LIB.cur]||Object.values(LIB.trips)[0]}
-    else{const id=uid();j.id=id;LIB.trips[id]=j;LIB.cur=id;T=j}
-    S.di=0;render();save();alert("불러왔습니다.")}
-    catch(err){alert("이 파일은 여행맵 데이터가 아닙니다.\n여행맵.json 파일을 선택해 주세요.")}};
-  r.readAsText(f)});
 document.querySelectorAll(".ovl").forEach(o=>o.addEventListener("click",e=>{if(e.target===o)o.classList.remove("on")}));
 
 document.getElementById("hereNears").innerHTML=
   NEAR.map(([k,q])=>`<a class="near" target="_blank" rel="noopener" href="${nearHere(q)}">${k}</a>`).join("");
 
 setInterval(()=>{if(lastSaved&&Date.now()-lastSaved>60000)saveNow()},60000);
-(async()=>{checkPersist();await load();await reconnect();showWarn();
+(async()=>{checkPersist();await load();showWarn();
   if(!HAS_LS)setTimeout(()=>alert("이 브라우저에서 자동 저장이 막혀 있습니다.\n작업 후 반드시 '내보내기'를 눌러 주세요."),800);
   const n=new Date();
   const v=pad(n.getHours())+":"+pad(Math.floor(n.getMinutes()/5)*5);
