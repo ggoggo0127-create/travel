@@ -374,11 +374,12 @@ body.gmap .gnote{display:block}
 
 
 <footer class="foot">
-  <button id="reconn" style="display:none;border-color:#F0C24B;background:#FDF6E3;color:#7A5A00">파일 연결 다시 허용</button><button id="link">파일에 자동저장 연결</button><button id="exp">내보내기</button><button id="imp">불러오기</button><button id="paste">붙여넣기로 불러오기</button><input type="file" id="impf" hidden><input type="file" id="phfile" accept="image/*" multiple hidden>
+  <button id="reconn" style="display:none;border-color:#F0C24B;background:#FDF6E3;color:#7A5A00">파일 연결 다시 허용</button><button id="link">파일에 자동저장 연결</button><button id="exp">내보내기</button><button id="imp">불러오기</button><button id="fromweb">웹에서 불러오기</button><button id="paste">붙여넣기</button><input type="file" id="impf" hidden><input type="file" id="phfile" accept="image/*" multiple hidden>
   <div id="pastebox" style="display:none;margin-top:10px">
     <textarea id="pastein" placeholder="PC에서 연 여행맵.json 내용을 전체 복사해서 여기에 붙여넣으세요"
       style="width:100%;min-height:110px;border:1px solid var(--rule);border-radius:10px;
       background:var(--paper);padding:10px;font-family:var(--mono);font-size:11px;line-height:1.6"></textarea>
+    <button id="pasteread" style="margin-top:6px">클립보드에서 붙여넣기</button>
     <button id="pasteok" style="margin-top:6px">이 내용으로 불러오기</button>
   </div>
   <br>지도 © OpenStreetMap 기여자 · 평점·영업시간·길찾기 데이터 © Google
@@ -1383,6 +1384,22 @@ let PHTARGET=null;
 function addPhoto(id){PHTARGET=id;document.getElementById("phfile").click()}
 document.addEventListener("DOMContentLoaded",()=>{});
 
+// 같은 폴더의 data.json 을 읽어옵니다 (GitHub에 올려두면 폰에서 바로 불러옵니다)
+async function loadFromWeb(){
+  const url=new URL("data.json",location.href).href;
+  if(!confirm("웹에 올려둔 데이터를 불러옵니다.\n지금 이 기기의 내용은 덮어써집니다.\n계속할까요?"))return;
+  try{
+    const r=await fetch(url+"?t="+Date.now());
+    if(!r.ok)throw new Error("data.json 을 찾을 수 없습니다 ("+r.status+")");
+    const j=await r.json();
+    if(j.trips){LIB=j;T=LIB.trips[LIB.cur]||Object.values(LIB.trips)[0]}
+    else{const id=uid();j.id=id;LIB={cur:id,trips:{[id]:j}};T=j}
+    S.di=0;render();await saveNow();alert("불러왔습니다.");
+  }catch(e){
+    alert("불러오지 못했습니다.\n"+e.message+
+      "\n\nGitHub 저장소에 여행맵.json 을 data.json 이라는 이름으로 올려두셔야 합니다.");
+  }
+}
 function doExport(){
   try{
     const b=new Blob([JSON.stringify(LIB,null,2)],{type:"application/json"});
@@ -1407,7 +1424,7 @@ function showWarn(){
 
 /* ═══ 조작 ═══ */
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-day],[data-open],[data-done],[data-del],[data-mv],[data-legedit],[data-segdel],[data-segadd],[data-fetchleg],[data-pick],[data-close],#addday,#addbtn,#setbtn,#delday,#go,#keysave,#diagrun,#savebtn,#warnx,#exp,#imp,#paste,#pasteok,#link,#reconn,#tripbtn,#basebtn,#basebtn2,#bgo,#mkNew,#mkCopy,#sgApply,#sgNo,[data-usetrip],[data-padd],[data-othercat],[data-m3],[data-phadd],[data-phdel],[data-mmode],[data-msave],[data-mclear],[data-diag],[data-bpick],[data-adel],[data-akind]");
+  const t=e.target.closest("[data-day],[data-open],[data-done],[data-del],[data-mv],[data-legedit],[data-segdel],[data-segadd],[data-fetchleg],[data-pick],[data-close],#addday,#addbtn,#setbtn,#delday,#go,#keysave,#diagrun,#savebtn,#warnx,#exp,#imp,#paste,#pasteok,#fromweb,#pasteread,#link,#reconn,#tripbtn,#basebtn,#basebtn2,#bgo,#mkNew,#mkCopy,#sgApply,#sgNo,[data-usetrip],[data-padd],[data-othercat],[data-m3],[data-phadd],[data-phdel],[data-mmode],[data-msave],[data-mclear],[data-diag],[data-bpick],[data-adel],[data-akind]");
   if(!t)return;const d=D();
   const id=k=>t.dataset[k];
   if(id("day")!==undefined&&t.dataset.day){S.di=+t.dataset.day;S.open=null;S.legEdit=null}
@@ -1466,6 +1483,11 @@ document.addEventListener("click",e=>{
   else if(t.id==="savebtn"){doExport();return}
   else if(t.id==="exp"){doExport();return}
   else if(t.id==="imp"){document.getElementById("impf").click();return}
+  else if(t.id==="fromweb"){loadFromWeb();return}
+  else if(t.id==="pasteread"){
+    (async()=>{try{const txt=await navigator.clipboard.readText();
+      document.getElementById("pastein").value=txt;}
+      catch(e){alert("클립보드를 읽지 못했습니다. 직접 붙여넣기 해주세요.")}})();return}
   else if(t.id==="paste"){
     const box=document.getElementById("pastebox");
     box.style.display=box.style.display==="none"?"block":"none";return}
